@@ -13,7 +13,8 @@
 
 <body>
     <h1 style="text-align: center;">水印姬</h1>
-    原图缩放（0.5就是50%的宽高）：<input type="text" id="ratio" value="0.5">水印透明度(0-1)：<input type="text" id="alpha" value="0.8"><br>
+    原图缩放（0.5就是50%的宽高）：<input type="text" id="ratio" value="0.5">水印透明度(0-1)：<input type="text" id="alpha"
+        value="0.8"><br>
     混合效果：<select id="effect">
         <option value="" selected>无</option>
         <option value="multiply">正片叠底</option>
@@ -22,30 +23,18 @@
         <option value="difference">差值</option>
         <option value="exclusion">排除</option>
     </select><br>
-    <input type="checkbox" id="bench"><label for="bench">批量版（无预览）</label><input type="checkbox" id="adjustable"><label
-        for="adjustable">自动缩小太大的水印</label>
+    <input type="checkbox" id="bench"><label for="bench">批量版（无预览）</label>
+    <input type="checkbox" id="adjustable"><label for="adjustable">自动缩小太大的水印</label><br>
+    <a href="https://weibo.com/277997265">微博</a><br>
     <h2 id="info1">把图片拖进来。</h2><br>
     <h2 id="info2" style="color: lightgray;">再把水印拖进来。</h2><br>
     <script>
-        try {
-            var ipcRenderer = require('electron').ipcRenderer;
-        } catch (e) {
-        }
         var imgType = false;
         var c = document.createElement("canvas");
         var ctx = c.getContext("2d");
         document.body.appendChild(c);
         var savefilename = "";
         var watermark;
-        function convertBase64UrlToBuffer(urlData) {
-            var bytes = window.atob(urlData.split(',')[1]);
-            var ab = new ArrayBuffer(bytes.length);
-            var ia = new Uint8Array(ab);
-            for (var i = 0; i < bytes.length; i++) {
-                ia[i] = bytes.charCodeAt(i);
-            }
-            return Buffer.from(ab);
-        }
         document.getElementById("bench").onclick = function () {
             imgType = false;
             benchFiles = [];
@@ -112,17 +101,12 @@
                         ctx.globalAlpha = 1;
                         ctx.globalCompositeOperation = "";
                         var imageData = c.toDataURL("image/png");
-                        if (ipcRenderer === undefined) {
-                            let tempLink = document.createElement("a");
-                            document.body.appendChild(tempLink);
-                            tempLink.style = "display:none;";
-                            tempLink.href = imageData;
-                            tempLink.download = "afterwatermark_" + savefilename;
-                            tempLink.click();
-                        } else {
-                            var bufferImg = convertBase64UrlToBuffer(imageData);
-                            ipcRenderer.send("save_file", "../afterwatermark_" + savefilename, bufferImg, true);
-                        }
+                        let tempLink = document.createElement("a");
+                        document.body.appendChild(tempLink);
+                        tempLink.style = "display:none;";
+                        tempLink.href = imageData;
+                        tempLink.download = "afterwatermark_" + savefilename;
+                        tempLink.click();
                         document.getElementById("info2").style = "color: lightgray;";
                         document.getElementById("info1").style = "";
                         imgType = false;
@@ -178,17 +162,12 @@
                                 ctxBench.globalAlpha = 1;
                                 ctxBench.globalCompositeOperation = "";
                                 var imageData = benchCanvas.toDataURL("image/png");
-                                if (ipcRenderer === undefined) {
-                                    let tempLink = document.createElement("a");
-                                    document.body.appendChild(tempLink);
-                                    tempLink.style = "display:none;";
-                                    tempLink.href = imageData;
-                                    tempLink.download = "afterwatermark_" + savefilename;
-                                    tempLink.click();
-                                } else {
-                                    var bufferImg = convertBase64UrlToBuffer(imageData);
-                                    ipcRenderer.send("save_file", "../afterwatermark_" + savefilename, bufferImg, true);
-                                }
+                                let tempLink = document.createElement("a");
+                                document.body.appendChild(tempLink);
+                                tempLink.style = "display:none;";
+                                tempLink.href = imageData;
+                                tempLink.download = "afterwatermark_" + savefilename;
+                                tempLink.click();
                                 URL.revokeObjectURL(img);
                             }
                         }
