@@ -1,0 +1,201 @@
+<html>
+
+<head>
+    <title>水印姬</title>
+    <meta charset="UTF-8">
+    <script>
+        document.ondragleave = function (e) { e.preventDefault(); };
+        document.ondragenter = function (e) { e.preventDefault(); };
+        document.ondragover = function (e) { e.preventDefault(); };
+        document.ondrop = function (e) { e.preventDefault(); };
+    </script>
+</head>
+
+<body>
+    设置分辨率比例：<input type="text" id="ratio" value="0.5">水印透明度(0-1)：<input type="text" id="alpha" value="0.8"><br>
+    混合效果：<select id="effect">
+        <option value="" selected>无</option>
+        <option value="multiply">正片叠底</option>
+        <option value="overlay">叠加</option>
+        <option value="screen">滤色</option>
+        <option value="difference">差值</option>
+        <option value="exclusion">排除</option>
+    </select><br>
+    <input type="checkbox" id="bench"><label for="bench">批量版（无预览）</label><input type="checkbox" id="adjustable"><label
+        for="adjustable">自动缩小太大的水印</label>
+    <h2 id="info1">把图片拖进来。</h2><br>
+    <h2 id="info2" style="color: lightgray;">再把水印拖进来。</h2><br>
+    <script>
+        try {
+            var ipcRenderer = require('electron').ipcRenderer;
+        } catch (e) {
+        }
+        var imgType = false;
+        var c = document.createElement("canvas");
+        var ctx = c.getContext("2d");
+        document.body.appendChild(c);
+        var savefilename = "";
+        var watermark;
+        function convertBase64UrlToBuffer(urlData) {
+            var bytes = window.atob(urlData.split(',')[1]);
+            var ab = new ArrayBuffer(bytes.length);
+            var ia = new Uint8Array(ab);
+            for (var i = 0; i < bytes.length; i++) {
+                ia[i] = bytes.charCodeAt(i);
+            }
+            return Buffer.from(ab);
+        }
+        document.getElementById("bench").onclick = function () {
+            imgType = false;
+            benchFiles = [];
+            document.getElementById("info1").style = "";
+            document.getElementById("info2").style = "color: lightgray;";
+            if (document.getElementById("bench").checked) {
+                document.getElementById("info1").innerText = "把水印拖进来。";
+                document.getElementById("info2").innerText = "随便拖图进来，拖多少打多少。";
+                document.body.removeChild(c);
+                c = null;
+                ctx = null;
+            } else {
+                document.getElementById("info1").innerText = "把图片拖进来。";
+                document.getElementById("info2").innerText = "再把水印拖进来。";
+                c = document.createElement("canvas");
+                ctx = c.getContext("2d");
+                document.body.appendChild(c);
+            }
+        }
+        document.body.ondrop = function (e) {
+            e.preventDefault();
+            var imgRatio = Number(document.getElementById("ratio").value);
+            var alphaRatio = Number(document.getElementById("alpha").value);
+            var fileList = e.dataTransfer.files;
+            if (fileList.length == 0) {
+                return false;
+            }
+            if (!document.getElementById("bench").checked) {
+                if (fileList[0].type.indexOf('image') === -1) {
+                    return false;
+                }
+                var img = URL.createObjectURL(fileList[0]);
+                var filename = fileList[0].name;
+                var bitmap = new Image();
+                bitmap.crossOrigin = '';
+                bitmap.src = img;
+                bitmap.onload = function () {
+                    if (!imgType) {
+                        c.width = bitmap.width * imgRatio;
+                        c.height = bitmap.height * imgRatio;
+                        ctx.drawImage(bitmap, 0, 0, c.width, c.height);
+                        document.getElementById("info2").style = "";
+                        document.getElementById("info1").style = "text-decoration: line-through; color: lightgray;";
+                        savefilename = filename;
+                        imgType = true;
+                        URL.revokeObjectURL(img);
+                    } else {
+                        var wmWidth, wmHeight;
+                        wmWidth = bitmap.width;
+                        wmHeight = bitmap.height;
+                        if (document.getElementById("adjustable").checked) {
+                            if (wmWidth > c.width) {
+                                wmHeight = wmHeight * (c.width / wmWidth);
+                                wmWidth = c.width;
+                            }
+                            if (wmHeight > c.height) {
+                                wmWidth = wmWidth * (c.height / wmHeight);
+                                wmHeight = c.height;
+                            }
+                        }
+                        ctx.globalCompositeOperation = document.getElementById("effect").value;
+                        ctx.globalAlpha = alphaRatio;
+                        ctx.drawImage(bitmap, (c.width - wmWidth) / 2, (c.height - wmHeight) / 2, wmWidth, wmHeight);
+                        ctx.globalAlpha = 1;
+                        ctx.globalCompositeOperation = "";
+                        var imageData = c.toDataURL("image/png");
+                        if (ipcRenderer === undefined) {
+                            let tempLink = document.createElement("a");
+                            document.body.appendChild(tempLink);
+                            tempLink.style = "display:none;";
+                            tempLink.href = imageData;
+                            tempLink.download = "afterwatermark_" + savefilename;
+                            tempLink.click();
+                        } else {
+                            var bufferImg = convertBase64UrlToBuffer(imageData);
+                            ipcRenderer.send("save_file", "../afterwatermark_" + savefilename, bufferImg, true);
+                        }
+                        document.getElementById("info2").style = "color: lightgray;";
+                        document.getElementById("info1").style = "";
+                        imgType = false;
+                        URL.revokeObjectURL(img);
+                    }
+                }
+            } else {
+                if (!imgType) {
+                    if (fileList[0].type.indexOf('image') === -1) {
+                        return false;
+                    }
+                    var img = URL.createObjectURL(fileList[0]);
+                    watermark = new Image();
+                    watermark.crossOrigin = '';
+                    watermark.src = img;
+                    watermark.onload = function () {
+                        document.getElementById("info2").style = "";
+                        document.getElementById("info1").style = "text-decoration: line-through; color: lightgray;";
+                        imgType = true;
+                    }
+                } else {
+                    Array.from(fileList).forEach(element => {
+                        if (element.type.indexOf('image') !== -1) {
+                            var img = URL.createObjectURL(element);
+                            var filename = element.name;
+                            var bitmap = new Image();
+                            bitmap.crossOrigin = '';
+                            bitmap.src = img;
+                            bitmap.setAttribute("name", filename);
+                            bitmap.onload = function () {
+                                var benchCanvas = document.createElement("canvas");
+                                var ctxBench = benchCanvas.getContext("2d");
+                                benchCanvas.width = this.width * imgRatio;
+                                benchCanvas.height = this.height * imgRatio;
+                                savefilename = this.name;
+                                ctxBench.drawImage(this, 0, 0, benchCanvas.width, benchCanvas.height);
+                                var wmWidth, wmHeight;
+                                wmWidth = watermark.width;
+                                wmHeight = watermark.height;
+                                if (document.getElementById("adjustable").checked) {
+                                    if (wmWidth > benchCanvas.width) {
+                                        wmHeight = wmHeight * (benchCanvas.width / wmWidth);
+                                        wmWidth = benchCanvas.width;
+                                    }
+                                    if (wmHeight > benchCanvas.height) {
+                                        wmWidth = wmWidth * (benchCanvas.height / wmHeight);
+                                        wmHeight = benchCanvas.height;
+                                    }
+                                }
+                                ctxBench.globalAlpha = alphaRatio;
+                                ctxBench.globalCompositeOperation = document.getElementById("effect").value;
+                                ctxBench.drawImage(watermark, (benchCanvas.width - wmWidth) / 2, (benchCanvas.height - wmHeight) / 2, wmWidth, wmHeight);
+                                ctxBench.globalAlpha = 1;
+                                ctxBench.globalCompositeOperation = "";
+                                var imageData = benchCanvas.toDataURL("image/png");
+                                if (ipcRenderer === undefined) {
+                                    let tempLink = document.createElement("a");
+                                    document.body.appendChild(tempLink);
+                                    tempLink.style = "display:none;";
+                                    tempLink.href = imageData;
+                                    tempLink.download = "afterwatermark_" + savefilename;
+                                    tempLink.click();
+                                } else {
+                                    var bufferImg = convertBase64UrlToBuffer(imageData);
+                                    ipcRenderer.send("save_file", "../afterwatermark_" + savefilename, bufferImg, true);
+                                }
+                                URL.revokeObjectURL(img);
+                            }
+                        }
+                    });
+                }
+            }
+        };
+    </script>
+</body>
+
+</html>
